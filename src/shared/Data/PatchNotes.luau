@@ -8,6 +8,14 @@ export type Release = { version: string, date: string, title: string, lines: { s
 
 PatchNotes.RELEASES = {
 	{
+		version = "0.9.10",
+		date = "9 Nov 2026",
+		title = "Join Us",
+		lines = {
+			"Join the game's community from the COMMUNITY row on the main menu, or from the Field Guide's credits.",
+		},
+	},
+	{
 		version = "0.9.8",
 		date = "9 Nov 2026",
 		title = "New Home",

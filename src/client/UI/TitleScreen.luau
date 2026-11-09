@@ -339,6 +339,8 @@ function TitleScreen.new(c: any)
 	self.open_general = Signal.new()
 	--- the Council's row: UIRoot opens its sheet
 	self.open_council = Signal.new()
+	--- the COMMUNITY row: Roblox's prompt to join the game's community (UIRoot._join_community)
+	self.open_community = Signal.new()
 	--- (action, user_id?) the party panel (Session.party_action)
 	self.party_action = Signal.new()
 	self.difficulty =
@@ -952,6 +954,7 @@ function TitleScreen._build_nav(self)
 		row("grant", "FOUNDING GRANT", "city", self.open_starter),
 		row("charter", "SOVEREIGN'S CHARTER", "charter", self.open_general),
 		row("guide", "FIELD GUIDE", "help", self.show_help),
+		row("community", "COMMUNITY", "alliance", self.open_community),
 		row("council", "COUNCIL", "settings", self.open_council),
 	}
 	-- (read once: which products exist doesn't change while a server runs)
@@ -1031,6 +1034,14 @@ TitleScreen.WIP_LINE = "Work in progress: still being built and balanced, and it
 function TitleScreen.depth_label(it: { any }): string
 	local s = "WAR: " .. string.upper(it[2])
 	return if it[4] then s .. " · " .. TitleScreen.WIP_TAG else s
+end
+
+--- A member of the game's community has no COMMUNITY row (UIRoot asks Roblox once the title is up).
+function TitleScreen.set_community_member(self, member: boolean)
+	local b = self._nav_rows and self._nav_rows.community
+	if b ~= nil then
+		b:set_visible(not member)
+	end
 end
 
 --- The depth picked on the solo menu ("long" / "quick"), or nil for the classic war.

@@ -58,6 +58,8 @@
 --   Analytics.from_client(player, kind, a, b, c)   an OP.ANALYTICS message: the server's own reports refused
 --   Analytics.economy(player, flow, amount, balance, transaction, sku, fields?)   Renown in or out (Economy dashboard)
 --
+--   Community Prompt (detail "<Title | Guide | Results> - <Joined | Pending | Already Member | Declined | Failed>"):
+--     Roblox's prompt to join the game's community, from where, and what it came to (client, 2026-11-09)
 --   Economy → Renown (2026-11-09; server/Purchases and server/Rewards log every change, after it is stored):
 --     Sources: Gameplay (a war's pay, sku "War - <mode>"; claims, sku "Order" / "Medal" / "Laurel" / "Season"),
 --     TimedReward (the daily muster, sku "Muster"; the Charter's days, sku "Charter Daily"), Onboarding (the
@@ -709,6 +711,14 @@ function Analytics.report(player: any, kind: any, a: any, b: any, c: any)
 			if name ~= nil then
 				custom(player, "Flag Bought", math.floor(paid), nil, name)
 			end
+		end
+	elseif kind == "community" then
+		-- (client) Roblox's prompt to join the game's community: from Title / Guide / Results, and what it came to
+		local froms = { title = "Title", guide = "Guide", results = "Results" }
+		local results = { joined = "Joined", pending = "Pending", member = "Already Member", none = "Declined", failed = "Failed" }
+		local f, r = froms[a], results[b]
+		if f ~= nil and r ~= nil then
+			custom(player, "Community Prompt", 1, nil, f .. " - " .. r)
 		end
 	elseif kind == "renown_flag" then
 		-- (the server) a Standard bought with Renown (its Renown: the Economy event, server/Purchases)

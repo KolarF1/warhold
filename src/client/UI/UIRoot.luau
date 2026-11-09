@@ -1063,6 +1063,28 @@ function UIRoot.debug_spawn(self)
 	return best
 end
 
+--- Studio debug channel: the COMMUNITY row as a non-member ("show") or a member ("hide") sees it, or "guide": the Field
+--- Guide open on its credits (screenshots: the
+--- owner is always a member). The prompt itself is Roblox's and doesn't show in Studio.
+function UIRoot.debug_community(self, arg: any)
+	if tostring(arg) == "guide" then
+		-- (the Field Guide open on its credits, where the JOIN THE COMMUNITY button is)
+		if not self.help.is_open then
+			self:toggle_help()
+		end
+		for i, t in self.help.TOPICS or {} do
+			if t.credits then
+				self.help:show_topic(i)
+			end
+		end
+		return "guide"
+	end
+	if self.title ~= nil then
+		self.title:set_community_member(tostring(arg) == "hide")
+	end
+	return tostring(arg)
+end
+
 --- Studio debug channel: a map mode ("nations", "defences", "provinces").
 function UIRoot.debug_map_mode(self, arg: any)
 	self.clock:set_mode(tostring(arg or "nations"))
@@ -1815,6 +1837,18 @@ function UIRoot._build(self)
 	end)
 	title.open_council:Connect(function()
 		self:open_settings()
+	end)
+	title.open_community:Connect(function()
+		self:_join_community("title")
+	end)
+	-- (the Field Guide's credits offer it too; a member sees no COMMUNITY row)
+	ctx.join_community = function(from: string)
+		self:_join_community(from)
+	end
+	task.spawn(function()
+		if UIRoot.community_member() then
+			title:set_community_member(true)
+		end
 	end)
 	title.open_locker:Connect(function()
 		self:open_locker()
@@ -3423,6 +3457,10 @@ function UIRoot._award_career(self, winner: number)
 	if won then
 		self:_ask_notifications()
 	end
+	-- (a good war, once per player: Roblox's prompt to join the game's community, the owner 2026-11-09)
+	if won or (tonumber(report.seconds) or 0) >= UICtx.data("Community").OFFER_AFTER_S then
+		self:_offer_community()
+	end
 	r.mission = report.mission and UICtx.data("Missions").LIST[UICtx.data("Missions").INDEX[report.mission]].name or nil
 	self._last_result = r
 	if r.gained <= 0 then
@@ -3530,6 +3568,65 @@ function UIRoot._ask_notifications(self)
 				svc:PromptOptIn()
 			end)
 		end
+	end)
+end
+
+--- Is the local player in the game's community? (Roblox's own answer; false when it can't say.) Yields.
+function UIRoot.community_member(): boolean
+	local Community = UICtx.data("Community")
+	local lp = game:GetService("Players").LocalPlayer
+	if lp == nil then
+		return false
+	end
+	local ok, member = pcall(function()
+		return (lp :: any):IsInGroupAsync(Community.ID)
+	end)
+	if not ok then
+		ok, member = pcall(function()
+			return lp:IsInGroup(Community.ID)
+		end)
+	end
+	return ok and member == true
+end
+
+--- Roblox's prompt to join the game's community (GroupService:PromptJoinAsync), from "title" / "guide" / "results".
+--- One at a time; what it came to goes to the analytics ("community"), and a member's COMMUNITY row hides.
+function UIRoot._join_community(self, from: string)
+	if self._community_busy then
+		return
+	end
+	self._community_busy = true
+	local Community = UICtx.data("Community")
+	task.spawn(function()
+		local ok, status = pcall(function()
+			return game:GetService("GroupService"):PromptJoinAsync(Community.ID)
+		end)
+		self._community_busy = false
+		local result = if ok and typeof(status) == "EnumItem" then Community.RESULTS[status.Name] or "none" else "failed"
+		local s = self.ctx.session
+		if s ~= nil and type(s.report) == "function" then
+			s:report("community", from, result)
+		end
+		if (result == "joined" or result == "member") and self.title ~= nil then
+			self.title:set_community_member(true)
+		end
+	end)
+end
+
+--- The results screen's offer, once per player (the setting "community_asked"), a few seconds after the screen comes
+--- up, and never to a member.
+function UIRoot._offer_community(self)
+	if self._offered_community or self.ctx:setting("community_asked", false) == true then
+		return
+	end
+	self._offered_community = true
+	task.delay(3.0, function()
+		if UIRoot.community_member() then
+			self.ctx:set_setting("community_asked", true)
+			return
+		end
+		self.ctx:set_setting("community_asked", true)
+		self:_join_community("results")
 	end)
 end
 

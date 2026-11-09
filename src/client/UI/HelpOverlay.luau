@@ -304,21 +304,22 @@ HelpOverlay.SIDE_W_PHONE = 168
 HelpOverlay.GAP = 14
 --- The sheet's body on a desktop.
 HelpOverlay.WIDTH = 800
---- The credits, the last topic: the AGPL's Appropriate Legal Notices (a copyright notice, no
---- warranty, that the game may be shared under the licence, where the licence is) and the credits
---- (2026-10-25: the AGPL licence and its notices and the copyright notice; the flags, map icons, sprites
---- and effects are RoWorld's own or public domain since that day, and the World map since 2026-10-26).
---- NOTICE.md and LICENSE in the source have the full text.
+--- The credits, the last topic: only what the licences ask for (the owner, 2026-11-09: "only text that the license
+--- requires"). The AGPL's Appropriate Legal Notices (LICENSE, section 0 and 5d): (1) a copyright notice, (2) no
+--- warranty, that the game may be shared under the licence, and how to see the licence. Its section 7(b) term keeps
+--- "© OpenFront and Contributors" (also the title's footer). CC BY 3.0 credits the icons' artists and, as they are recoloured, says they were adapted (its 4(b)). Section 13's source
+--- is the line under these. Not required, so gone: "a modified version of RoWorld" (NOTICE.md says it, with the source),
+--- the public-domain map data, and "not affiliated" (7(c) forbids misrepresenting the game; it asks for no statement).
 HelpOverlay.LEGAL = {
-	"Warhold is a modified version of RoWorld (Snick Co.), itself a modified version of OpenFront. © OpenFront and Contributors. Changes © 2026 Snick Co. Changes © 2026 the Warhold developers.",
-	"Warhold is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License, version 3, with the additional terms in its LICENSE file. It comes with ABSOLUTELY NO WARRANTY. The licence comes with the game's source code.",
-	"Maps made with Natural Earth and NOAA ETOPO1 data (public domain).",
-	"Icons made by Lorc, Delapouite, Skoll, HeavenlyDog and Pierre Leducq, from game-icons.net (CC BY 3.0).",
-	"Warhold is not affiliated with or endorsed by OpenFront or Snick Co.",
+	"© OpenFront and Contributors. Changes © 2026 Snick Co. Changes © 2026 the Warhold developers.",
+	"No warranty. You may share and change this game under the GNU Affero General Public License v3; the licence comes with the source.",
+	"Icons adapted from Lorc, Delapouite, Skoll, HeavenlyDog and Pierre Leducq (game-icons.net), CC BY 3.0.",
 }
 --- Where the source lives, under the credits: plain text with the GitHub mark, since Roblox games
 --- can't link off-platform (2026-10-25: "Source <github logo> <repo>" at the bottom; the public repo is
 --- lukechatton/roworld, lukechatton/rofront is private).
+--- The credits' caption column (Source, Community), px.
+HelpOverlay.CAPTION_W = 84
 HelpOverlay.SOURCE_REPO = "KolarF1/warhold" -- (AGPL section 13: where this game's source is published)
 --- The card that pops up over the repo name when it's pressed (2026-10-25), and how long it stays.
 HelpOverlay.SOURCE_TIP = {
@@ -530,6 +531,8 @@ function HelpOverlay._credits(self, page: any)
 	local row = T.hbox(6)
 	local cap = T.label("Source", 13, 500, T.TEXT_3)
 	cap.size_flags_vertical = W.SHRINK_CENTER
+	-- (the credits' captions share a width, so the Source and Community lines' values start together)
+	cap:set_min_size(Vector2.new(HelpOverlay.CAPTION_W, 0))
 	row:add_child(cap)
 	local b = T.button(HelpOverlay.SOURCE_REPO, "GhostButton", "github", 44.0)
 	b:set_font_size(13)
@@ -540,6 +543,23 @@ function HelpOverlay._credits(self, page: any)
 	end)
 	row:add_child(b)
 	page:add_child(row)
+	-- the game's community (Data/Community): Roblox's own prompt to join it (UIRoot._join_community)
+	if type(self.ctx.join_community) == "function" then
+		local crow = T.hbox(6)
+		local ccap = T.label("Community", 13, 500, T.TEXT_3)
+		ccap.size_flags_vertical = W.SHRINK_CENTER
+		ccap:set_min_size(Vector2.new(HelpOverlay.CAPTION_W, 0))
+		crow:add_child(ccap)
+		local j = T.button("Join the community", "GhostButton", "alliance", 44.0)
+		j:set_font_size(13)
+		j:add_theme_constant_override("icon_max_width", 18)
+		j.size_flags_vertical = W.SHRINK_CENTER
+		j.pressed:Connect(function()
+			self.ctx.join_community("guide")
+		end)
+		crow:add_child(j)
+		page:add_child(crow)
+	end
 end
 
 --- The tooltip card above the repo name (forced, so taps show it too); it hides after SOURCE_TIP_S,
