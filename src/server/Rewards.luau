@@ -10,7 +10,8 @@
 --
 --   Rewards.configure(deps)          { add_stars = fn(player, n, minutes) -> (ok, balance),
 --                                      general = fn(player) -> boolean, send = fn(player,
---                                      payload), now = fn() -> s, log? }
+--                                      payload), now = fn() -> s, log?,
+--                                      economy? = Analytics.economy (the Renown a war paid, after it is stored) }
 -- A Charter holder with a paid cycle (Data/Subscription) gets a stipend for each age the war lived through, a sum of its
 -- own that no other line changes (the "general" line).
 --   Rewards.solo_started(player, mode)   the client's match_start ("solo0" / "solo1" / "solo2")
@@ -65,6 +66,16 @@ local function deliver(player: any, lines: { { any } }, total: number, mode: str
 	end
 	if deps.send then
 		pcall(deps.send, player, { lines = lines, total = total, balance = balance, mode = mode })
+	end
+	if deps.economy then
+		-- (the Charter's stipend is a line of its own: the third field says whether this war's pay had one)
+		local stipend = false
+		for _, l in lines do
+			if l[1] == "general" then
+				stipend = true
+			end
+		end
+		pcall(deps.economy, player, "Source", total, balance, "Gameplay", "War - " .. mode, { if stipend then "Charter Stipend" else "No Stipend" })
 	end
 	if deps.log then
 		deps.log(string.format("[Rewards] %s +%d Stars (%s)", tostring(player.UserId), total, mode))

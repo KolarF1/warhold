@@ -915,7 +915,8 @@ function ServerMain.start()
 				return
 			end
 			analytics_budget[player] = a_used + 1
-			local ok, err = pcall(Analytics.report, player, ...)
+			-- (a client's report: the server's own kinds are refused, Analytics.SERVER_ONLY)
+			local ok, err = pcall(Analytics.from_client, player, ...)
 			if not ok then
 				report_once("Analytics.report", err)
 			end
@@ -1430,6 +1431,8 @@ function ServerMain.start()
 	Purchases.configure({
 		datastore = purchase_store,
 		players = Players,
+		-- (every change of Renown, after it is stored: the Economy dashboard)
+		economy = Analytics.economy,
 		notify = function(player: Player, credits: any)
 			send(player, OP.CREDITS, credits)
 		end,
@@ -1473,6 +1476,7 @@ function ServerMain.start()
 	Rewards.configure({
 		add_stars = Purchases.add_stars,
 		general = General.active,
+		economy = Analytics.economy,
 		badge = Badges.award,
 		send = function(player: Player, payload: any)
 			send(player, OP.STARS, payload)

@@ -310,6 +310,40 @@ local function log(text: string)
 	end
 end
 
+--- Renown in ("Source") or out ("Sink") for the Economy dashboard (deps.economy = Analytics.economy), after the write
+--- that moved it; `balance` is the wallet that write stored. Nothing when no one is there or nothing moved.
+local function economy(
+	player: any,
+	flow: string,
+	amount: number,
+	balance: number,
+	transaction: string,
+	sku: string?,
+	f: { string }?
+)
+	if player == nil or amount <= 0 or deps.economy == nil then
+		return
+	end
+	pcall(deps.economy, player, flow, amount, balance, transaction, sku, f)
+end
+
+--- What a claim id is, for the Economy dashboard: (its transaction, its sku). Data/Claims writes the ids.
+function Purchases.claim_kind(id: string): (string, string)
+	local p = string.sub(id, 1, 2)
+	if p == "d:" then
+		return "TimedReward", "Muster"
+	elseif p == "o:" then
+		return "Gameplay", "Order"
+	elseif p == "m:" then
+		return "Gameplay", "Medal"
+	elseif p == "l:" then
+		return "Gameplay", "Laurel"
+	elseif p == "s:" then
+		return "Gameplay", "Season"
+	end
+	return "Gameplay", "Claim"
+end
+
 local function player_by_id(user_id: number): any
 	local ps = deps.players
 	if ps == nil then
@@ -485,6 +519,8 @@ end
 function Purchases.grant(user_id: number, kind: string, receipt: string, n: number?, spent: number?): string
 	local count = math.clamp(math.floor(n or 1), 1, 10)
 	local stored: Record? = nil
+	--- the Renown this receipt gave (set on each run of the write: a retried receipt gives none)
+	local gained = 0
 	--- A first-only product ("first:crate"): what it grants, when it really is the buyer's first (checked in the record).
 	local first_of = string.match(kind, "^first:(.+)$")
 	local buyer = player_by_id(user_id)
@@ -495,6 +531,8 @@ function Purchases.grant(user_id: number, kind: string, receipt: string, n: numb
 	local ok, err = pcall(function()
 		deps.datastore:UpdateAsync(key(user_id), function(old: any): any
 			local rec = clean(old, user_id)
+			gained = 0
+			local before = rec.stars
 			if table.find(rec.receipts, receipt) then
 				stored = rec -- granted before (a retry): nothing to add
 				return nil
@@ -511,6 +549,7 @@ function Purchases.grant(user_id: number, kind: string, receipt: string, n: numb
 					end
 					rec.paid = true
 					stored = rec
+					gained = rec.stars - before
 					return rec
 				end
 				kind = first_of
@@ -599,6 +638,7 @@ function Purchases.grant(user_id: number, kind: string, receipt: string, n: numb
 			end
 			rec.paid = true
 			stored = rec
+			gained = rec.stars - before
 			return rec
 		end)
 	end)
@@ -618,6 +658,7 @@ function Purchases.grant(user_id: number, kind: string, receipt: string, n: numb
 		if unlocked ~= nil and deps.unlocked then
 			pcall(deps.unlocked, player, unlocked)
 		end
+		economy(player, "Source", gained, (stored :: Record).stars, "IAP", (string.gsub(kind, "^first:", "")))
 	end
 	log(string.format("granted %s%s to %d (%s)", kind, if count > 1 then " x" .. count else "", user_id, receipt))
 	return "granted"
@@ -788,6 +829,9 @@ function Purchases.open_crate(player: any): (boolean, string?, number?)
 	if got == nil then
 		return false, "no crate"
 	end
+	if got == "renown" and renown ~= nil and stored ~= nil then
+		economy(player, "Source", renown, (stored :: Record).stars, "IAP", "Spoils", { if barred then "Restricted" else "Duplicate" })
+	end
 	return true, got, renown
 end
 
@@ -858,6 +902,7 @@ function Purchases.tutorial_bonus(player: any, amount: number): boolean
 	remember(player, stored :: Record)
 	if paid then
 		notify(player)
+		economy(player, "Source", add, (stored :: Record).stars, "Onboarding", "Tutorial")
 	end
 	return paid
 end
@@ -904,6 +949,9 @@ function Purchases.general_perks(player: any, cycles: { any }, day: number, skin
 	remember(player, stored :: Record)
 	if next(given) ~= nil then
 		notify(player)
+	end
+	if given.stars ~= nil then
+		economy(player, "Source", given.stars, (stored :: Record).stars, "TimedReward", "Charter Daily", { tostring(given.days or 1) .. " days" })
 	end
 	return given
 end
@@ -998,9 +1046,11 @@ function Purchases.claim_renown(player: any, ids: any): (boolean, { string }, nu
 	local why: string? = nil
 	local stored: Record? = nil
 	local gift = false
+	--- { id, Renown } of each id paid (the Economy dashboard's rows)
+	local amounts: { { any } } = {}
 	local ok, err = pcall(function()
 		deps.datastore:UpdateAsync(key(player.UserId), function(old: any): any
-			paid, total, why, gift = {}, 0, nil, false
+			paid, total, why, gift, amounts = {}, 0, nil, false, {}
 			local rec = clean(old, player.UserId)
 			stored = rec
 			local day = now_s() // 86400
@@ -1009,6 +1059,8 @@ function Purchases.claim_renown(player: any, ids: any): (boolean, { string }, nu
 				if amount ~= nil then
 					table.insert(paid, ids[i])
 					total += amount
+					local row = { ids[i], amount }
+					table.insert(amounts, row)
 					if ids[i] == Claims.muster_id(#Claims.MUSTER) then
 						-- the muster's seventh day: a free Spoils where they're allowed (free, so no purchase rules; it
 						-- doesn't count as one bought), else its worth in Renown
@@ -1017,6 +1069,7 @@ function Purchases.claim_renown(player: any, ids: any): (boolean, { string }, nu
 							gift = true
 						else
 							total += Purchases.MUSTER_SPOILS_RENOWN
+							row[2] += Purchases.MUSTER_SPOILS_RENOWN
 						end
 					end
 				elseif why == nil then
@@ -1041,6 +1094,14 @@ function Purchases.claim_renown(player: any, ids: any): (boolean, { string }, nu
 	if total > 0 then
 		notify(player)
 		log(string.format("%d claimed %d Renown (%d ids)", player.UserId, total, #paid))
+		if stored ~= nil then
+			local running = (stored :: Record).stars - total
+			for _, row in amounts do
+				running += row[2]
+				local transaction, sku = Purchases.claim_kind(row[1])
+				economy(player, "Source", row[2], running, transaction, sku)
+			end
+		end
 	end
 	return true, paid, total, why
 end
@@ -1092,6 +1153,7 @@ function Purchases.buy_cosmetic(player: any, item_id: any): (boolean, string?)
 	if not done then
 		return false, why
 	end
+	economy(player, "Sink", price, (stored :: Record).stars, "Shop", it.id, { "Standard" })
 	log(string.format("%d bought %s for %d Renown", player.UserId, it.id, price))
 	return true, nil
 end
@@ -1142,6 +1204,11 @@ function Purchases.buy_unlock(player: any, item_key: any): (boolean, string?)
 	end
 	if deps.unlocked then
 		pcall(deps.unlocked, player, it.key)
+	end
+	-- (an item with a `bonus` gives Renown back as it unlocks: none has one today, Data/Arsenal)
+	economy(player, "Sink", it.stars, (stored :: Record).stars - (it.bonus or 0), "Shop", it.key, { "War College" })
+	if (it.bonus or 0) > 0 then
+		economy(player, "Source", it.bonus, (stored :: Record).stars, "Gameplay", it.key, { "Unlock Bonus" })
 	end
 	log(string.format("%d unlocked %s for %d Stars", player.UserId, it.key, it.stars))
 	return true, nil

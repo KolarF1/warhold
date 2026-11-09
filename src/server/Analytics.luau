@@ -54,7 +54,15 @@
 --
 --   Analytics.configure(deps)   the Roblox services (tests inject fakes)
 --   Analytics.joined(player)    PlayerAdded
---   Analytics.report(player, kind, a, b, c)   an OP.ANALYTICS message
+--   Analytics.report(player, kind, a, b, c)   a report (the server's own, or one passed on by from_client)
+--   Analytics.from_client(player, kind, a, b, c)   an OP.ANALYTICS message: the server's own reports refused
+--   Analytics.economy(player, flow, amount, balance, transaction, sku, fields?)   Renown in or out (Economy dashboard)
+--
+--   Economy → Renown (2026-11-09; server/Purchases and server/Rewards log every change, after it is stored):
+--     Sources: Gameplay (a war's pay, sku "War - <mode>"; claims, sku "Order" / "Medal" / "Laurel" / "Season"),
+--     TimedReward (the daily muster, sku "Muster"; the Charter's days, sku "Charter Daily"), Onboarding (the
+--     tutorial), IAP (Renown a Robux product gave, sku its product kind; Spoils that gave Renown, sku "Spoils").
+--     Sinks: Shop (a War College unlock, sku its key; a Standard bought with Renown, sku its item id).
 --   Analytics.left(player)      PlayerRemoving (an open match ends as "Quit Game")
 
 local Analytics = {}
@@ -128,6 +136,24 @@ Analytics.ARSENAL_FROM = {
 }
 Analytics.RARITY_NAMES = { common = "Common", rare = "Rare", epic = "Epic", legendary = "Legendary" }
 Analytics.STATS = "stats"
+--- The Economy dashboard's one currency (renaming it later breaks the dashboard's history).
+Analytics.CURRENCY = "Renown"
+--- Reports only the server makes: from a client they are refused (a tampered client could write any value into them;
+--- 2026-11-09 audit). A kind maps to true (all of it) or to the set of its `a` the server owns.
+Analytics.SERVER_ONLY = {
+	crate_opened = true,
+	credit_bought = true,
+	credit_used = true,
+	equipped = true,
+	hop = true,
+	left = true,
+	renown_flag = true,
+	stars_paid = true,
+	unlocked = true,
+	starter = { shown = true, bought = true },
+	general = { subscribed = true },
+	flag_shop = { bought = true, bought_pack = true },
+}
 --- Longest match time a report may claim (minutes).
 Analytics.MAX_MINUTES = 240
 Analytics.MAX_RANK = 1000
@@ -144,7 +170,8 @@ type Match = {
 	slow: boolean?,
 	slow_mem: boolean?,
 }
-type Entry = { onboarding: { [number]: boolean }, match: Match? }
+--- `matches` / `ten`: the saved stats once loaded (matches played; a match has lasted 10 minutes: what "Second Match" needs)
+type Entry = { onboarding: { [number]: boolean }, match: Match?, matches: number?, ten: boolean? }
 -- (a Match may also carry `tutorial`: the tutorial steps logged for it)
 
 local IS_ROBLOX = typeof(game) == "Instance"
@@ -184,6 +211,40 @@ if IS_ROBLOX then
 			return
 		end
 		AnalyticsService:LogCustomEvent(player, name, value, fields(f))
+	end
+	deps.economy = function(
+		player: Player,
+		flow: string,
+		amount: number,
+		balance: number,
+		transaction: string,
+		sku: string?,
+		f: { string }?
+	)
+		if studio then
+			print(
+				string.format(
+					"[Analytics] economy %s Renown %d (balance %d) %s %s [%s]",
+					flow,
+					amount,
+					balance,
+					transaction,
+					tostring(sku),
+					table.concat(f or {}, ", ")
+				)
+			)
+			return
+		end
+		AnalyticsService:LogEconomyEvent(
+			player,
+			(Enum.AnalyticsEconomyFlowType :: any)[flow],
+			Analytics.CURRENCY,
+			amount,
+			balance,
+			transaction,
+			sku,
+			fields(f)
+		)
 	end
 	deps.guid = function(): string
 		return HttpService:GenerateGUID(false)
@@ -418,9 +479,13 @@ function Analytics.report(player: any, kind: any, a: any, b: any, c: any)
 		onboard(player, e, 3)
 		local function with_stats(stats: any)
 			local n = if type(stats) == "table" then tonumber(stats.matches) or 0 else 0
+			-- (a later step logged marks every step before it done: "Second Match" waits for a match that lasted 10
+			-- minutes, this session or an earlier one, so a player who fell early isn't counted as one who held on)
+			e.ten = e.ten == true or e.onboarding[7] == true or (type(stats) == "table" and stats.ten == true)
 			nm.exp = Analytics.experience(n)
-			call(deps.save_stats, player, { matches = math.min(n + 1, 1000000) })
-			if n >= 1 then
+			e.matches = math.min(n + 1, 1000000)
+			call(deps.save_stats, player, { matches = e.matches, ten = if e.ten then true else nil })
+			if n >= 1 and e.ten then
 				onboard(player, e, 8)
 			end
 			funnel(player, nm, 1)
@@ -457,6 +522,12 @@ function Analytics.report(player: any, kind: any, a: any, b: any, c: any)
 		if mm.minutes >= 10 then
 			onboard(player, e, 7)
 			funnel(player, mm, 5)
+			if not e.ten then
+				e.ten = true
+				if e.matches ~= nil then
+					call(deps.save_stats, player, { matches = e.matches, ten = true })
+				end
+			end
 		end
 	elseif kind == "eliminated" then
 		if not open then
@@ -639,6 +710,9 @@ function Analytics.report(player: any, kind: any, a: any, b: any, c: any)
 				custom(player, "Flag Bought", math.floor(paid), nil, name)
 			end
 		end
+	elseif kind == "renown_flag" then
+		-- (the server) a Standard bought with Renown (its Renown: the Economy event, server/Purchases)
+		custom(player, "Flag Shop", 1, nil, "Bought With Renown")
 	elseif kind == "stars_paid" then
 		-- (the server) value: the Stars a match paid
 		local n = tonumber(a)
@@ -646,6 +720,40 @@ function Analytics.report(player: any, kind: any, a: any, b: any, c: any)
 			custom(player, "Stars Earned", math.clamp(math.floor(n), 0, 1000000), if m ~= nil then m else nil)
 		end
 	end
+end
+
+--- An OP.ANALYTICS message from a client: the server's own reports (SERVER_ONLY) are dropped, the rest go to report.
+--- True when it was passed on.
+function Analytics.from_client(player: any, kind: any, a: any, b: any, c: any): boolean
+	if type(kind) ~= "string" then
+		return false
+	end
+	local own = Analytics.SERVER_ONLY[kind]
+	if own == true or (type(own) == "table" and own[a] == true) then
+		return false
+	end
+	Analytics.report(player, kind, a, b, c)
+	return true
+end
+
+--- Renown in ("Source") or out ("Sink") of `player`'s wallet, after the write that moved it: `amount` > 0, `balance`
+--- the wallet after it, `transaction` an AnalyticsEconomyTransactionType name (or a word of ours), `sku` what it was
+--- for, `f` up to three fields.
+function Analytics.economy(
+	player: any,
+	flow: string,
+	amount: number,
+	balance: number,
+	transaction: string,
+	sku: string?,
+	f: { string }?
+)
+	local n = math.floor(tonumber(amount) or 0)
+	local bal = math.floor(tonumber(balance) or 0)
+	if player == nil or n <= 0 or n ~= n or bal ~= bal or (flow ~= "Source" and flow ~= "Sink") then
+		return
+	end
+	call(deps.economy, player, flow, n, math.max(bal, 0), transaction, if sku ~= nil then Analytics.field(sku) else nil, f)
 end
 
 --- Who on this server is doing what now, for the lobby service's live stats page (how many people
