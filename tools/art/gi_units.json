@@ -1,0 +1,32 @@
+{
+  "atom": {
+    "src": "lorc/rocket.svg",
+    "turn": -45
+  },
+  "hydrogen": {
+    "src": "skoll/nuclear-bomb.svg",
+    "turn": -135
+  },
+  "m_train": {
+    "src": "delapouite/old-wagon.svg"
+  },
+  "sam": {
+    "src": "lorc/rocket.svg",
+    "turn": -45
+  },
+  "trade": {
+    "drop_below": 400,
+    "src": "delapouite/cargo-ship.svg"
+  },
+  "train": {
+    "src": "delapouite/truck.svg"
+  },
+  "transport": {
+    "flip": true,
+    "src": "delapouite/drakkar.svg"
+  },
+  "warhead": {
+    "src": "lorc/rocket.svg",
+    "turn": -45
+  }
+}

@@ -1,0 +1,46 @@
+-- (Hand-edited since 2026-10-31: the upstream's atlases and big sheets are gone. tools/assets/make_shop_flags.py once wrote this
+-- file and must not be rerun.) The Standards (Data/Shop; `set`: the age each is sold under), and each one's developer product
+-- in production (`product`) and Rofront Staging (`staging`), 0 = not made yet. `key` is saved, so it never changes, even where
+-- the picture and the name moved on (cat, capybara, pizza...). Each key's picture: tools/art/standards.luau, by way of Art/Emblem.
+return {
+	atlases = {},
+	big = {},
+	flags = {
+		{ key = "pumpkin_king", name = "The Last Hour", rarity = "rare", set = "reckoning", product = 3729594267, staging = 0 },
+		{ key = "bat_moon", name = "Carrion Raven", rarity = "epic", set = "reckoning", product = 3729594276, staging = 0 },
+		{ key = "grinning_skull", name = "Reaper's Scythe", rarity = "epic", set = "reckoning", product = 3729594287, staging = 0 },
+		{ key = "cauldron", name = "Driving Gale", rarity = "rare", set = "conflict", product = 3729594291, staging = 0 },
+		{ key = "phantom", name = "Coiled Adder", rarity = "rare", set = "conflict", product = 3729594300, staging = 0 },
+		{ key = "spider_web", name = "Iron Scarab", rarity = "epic", set = "conflict", product = 3729594309, staging = 0 },
+		{ key = "lion_crest", name = "Iron Portcullis", rarity = "rare", set = "dawn", product = 3729594316, staging = 0 },
+		{ key = "wolf_pack", name = "Great Stag", rarity = "epic", set = "dawn", product = 3729594318, staging = 0 },
+		{ key = "dragon_dynasty", name = "Harvest Sheaf", rarity = "rare", set = "dawn", product = 3729594326, staging = 0 },
+		{ key = "phoenix", name = "Golden Bee", rarity = "rare", set = "dawn", product = 3729594331, staging = 0 },
+		{ key = "radioactive", name = "Sundered World", rarity = "legendary", set = "reckoning", product = 3729594338, staging = 0 },
+		{ key = "warhead", name = "Tattered Banner", rarity = "epic", set = "reckoning", product = 3729594349, staging = 0 },
+		{ key = "mirv_storm", name = "Broken Sword", rarity = "rare", set = "reckoning", product = 3729594351, staging = 0 },
+		{ key = "big_red_button", name = "Empty Throne", rarity = "legendary", set = "reckoning", product = 3729594357, staging = 0 },
+		{ key = "kraken", name = "Skyward", rarity = "rare", set = "expansion", product = 3729594360, staging = 0 },
+		{ key = "anchor", name = "Breaching Whale", rarity = "epic", set = "expansion", product = 3729594366, staging = 0 },
+		{ key = "jolly_roger", name = "Pole Star", rarity = "rare", set = "expansion", product = 3729594369, staging = 0 },
+		{ key = "lighthouse", name = "Explorer's Spyglass", rarity = "epic", set = "expansion", product = 3729594376, staging = 0 },
+		{ key = "astronaut", name = "Caravan Camel", rarity = "epic", set = "expansion", product = 3729594384, staging = 0 },
+		{ key = "rocket", name = "The Flagship", rarity = "legendary", set = "expansion", product = 3729594389, staging = 0 },
+		{ key = "ringed_planet", name = "Far Peaks", rarity = "rare", set = "expansion", product = 3729594391, staging = 0 },
+		{ key = "comet", name = "Ship's Helm", rarity = "rare", set = "expansion", product = 3729594397, staging = 0 },
+		{ key = "cat", name = "Boar's Head", rarity = "epic", set = "dawn", product = 3729594402, staging = 0 },
+		{ key = "capybara", name = "Mountain Ram", rarity = "rare", set = "dawn", product = 3729594408, staging = 0 },
+		{ key = "rubber_duck", name = "Sun in Splendour", rarity = "legendary", set = "dawn", product = 3729594413, staging = 0 },
+		{ key = "pizza", name = "Elder Oak", rarity = "legendary", set = "dawn", product = 3729594419, staging = 0 },
+		{ key = "volcano", name = "War Torch", rarity = "rare", set = "conflict", product = 3729594428, staging = 0 },
+		{ key = "thunder", name = "Fire Arrows", rarity = "epic", set = "conflict", product = 3729594438, staging = 0 },
+		{ key = "frost_crown", name = "Black Scorpion", rarity = "rare", set = "conflict", product = 3729594444, staging = 0 },
+		{ key = "tornado", name = "Burning Keep", rarity = "epic", set = "conflict", product = 3729594453, staging = 0 },
+	},
+	sets = {
+		dawn = { product = 3729594460, staging = 0 },
+		expansion = { product = 3729594464, staging = 0 },
+		conflict = { product = 3729594466, staging = 0 },
+		reckoning = { product = 3729594475, staging = 0 },
+	},
+}
