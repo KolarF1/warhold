@@ -809,6 +809,9 @@ function Analytics.report(player: any, kind: any, a: any, b: any, c: any)
 		end
 		m.kind_logged = true
 		call(deps.custom, player, "Match Kind", 1, { war, depth, period })
+	elseif kind == "notify_ask" then
+		-- (client) Roblox's ask to let the game send notifications was shown (what was answered, Roblox's dashboard knows)
+		custom(player, "Notify Asked", 1, nil, nil)
 	elseif kind == "community" then
 		-- (client) Roblox's prompt to join the game's community: from Title / Guide / Results, and what it came to
 		local froms = { title = "Title", guide = "Guide", results = "Results" }

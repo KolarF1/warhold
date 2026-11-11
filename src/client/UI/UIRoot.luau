@@ -3476,12 +3476,11 @@ function UIRoot._award_career(self, winner: number)
 		left = s.phase == Defs.PHASE_PLAYING and winner == 0 and self._log.eliminated_at == nil,
 	})
 	local r = Progress.after_match(saved, report, Progress.day_of(Progress.now()))
-	if won then
-		self:_ask_notifications()
-	end
-	-- (a good war, once per player: Roblox's prompt to join the game's community, the owner 2026-11-09)
+	-- (a good war: a win, or a war lived 10 minutes. One Roblox prompt a results screen: first the ask to let the game send
+	-- notifications (big updates reach those who said yes, the owner 2026-11-11), and once that is answered, the
+	-- community's. Two at once stacked on the screen)
 	if won or (tonumber(report.seconds) or 0) >= UICtx.data("Community").OFFER_AFTER_S then
-		self:_offer_community()
+		self:_after_good_war()
 	end
 	r.mission = report.mission and UICtx.data("Missions").LIST[UICtx.data("Missions").INDEX[report.mission]].name or nil
 	self._last_result = r
@@ -3567,28 +3566,51 @@ end
 --- (release 2026-11-07; the texts are made on the Creator Dashboard and sent by an Open Cloud job: docs/RELEASE_CHECKLIST.md)
 --- Off until something sends notifications (an Open Cloud sender: docs/RELEASE_CHECKLIST.md): Roblox lets the ask come
 --- once a month, so it must not be spent on nothing (release review 2026-11-07).
-UIRoot.ASK_NOTIFICATIONS = false
+--- On (the owner, 2026-11-11): update announcements are sent from the Creator Dashboard (Events & Updates) to everyone
+--- who said yes, so the ask is no longer spent on nothing.
+UIRoot.ASK_NOTIFICATIONS = true
 
-function UIRoot._ask_notifications(self)
+--- Roblox's ask to let the game send notifications, if it may come now (not asked before here, and Roblox allows it:
+--- once a month at most, never to one who already said yes). True when it was shown. Yields.
+function UIRoot._ask_notifications(self): boolean
 	if not UIRoot.ASK_NOTIFICATIONS or self._asked_notify or self.ctx:setting("notify_asked", false) == true then
-		return
+		return false
+	end
+	local ok, svc = pcall(function()
+		return game:GetService("ExperienceNotificationService")
+	end)
+	if not ok or svc == nil then
+		return false
+	end
+	local can_ok, can = pcall(function()
+		return svc:CanPromptOptInAsync()
+	end)
+	if not (can_ok and can) then
+		-- (said yes already, or Roblox won't ask again yet: the community may have this screen)
+		return false
 	end
 	self._asked_notify = true
-	task.delay(4.0, function()
-		local ok, svc = pcall(function()
-			return game:GetService("ExperienceNotificationService")
-		end)
-		if not ok or svc == nil then
-			return
-		end
-		local can_ok, can = pcall(function()
-			return svc:CanPromptOptInAsync()
-		end)
-		if can_ok and can then
-			self.ctx:set_setting("notify_asked", true)
-			pcall(function()
-				svc:PromptOptIn()
-			end)
+	self.ctx:set_setting("notify_asked", true)
+	pcall(function()
+		svc:PromptOptIn()
+	end)
+	local s = self.ctx.session
+	if s ~= nil and type(s.report) == "function" then
+		s:report("notify_ask")
+	end
+	return true
+end
+
+--- After a good war, a few seconds into the results: the notifications ask if it may come, else the community's offer.
+function UIRoot._after_good_war(self)
+	if self._good_war_busy then
+		return
+	end
+	self._good_war_busy = true
+	task.delay(3.0, function()
+		self._good_war_busy = false
+		if not self:_ask_notifications() then
+			self:_offer_community(0)
 		end
 	end)
 end
@@ -3637,12 +3659,12 @@ end
 
 --- The results screen's offer, once per player (the setting "community_asked"), a few seconds after the screen comes
 --- up, and never to a member.
-function UIRoot._offer_community(self)
+function UIRoot._offer_community(self, wait_s: number?)
 	if self._offered_community or self.ctx:setting("community_asked", false) == true then
 		return
 	end
 	self._offered_community = true
-	task.delay(3.0, function()
+	task.delay(wait_s or 3.0, function()
 		if UIRoot.community_member() then
 			self.ctx:set_setting("community_asked", true)
 			return
