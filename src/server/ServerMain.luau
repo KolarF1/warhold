@@ -1353,6 +1353,7 @@ function ServerMain.start()
 			return if s ~= nil then s.name .. " Pack" else nil, if p ~= nil then p.robux else 0
 		end,
 		tutorial_steps = TutorialData.FUNNEL,
+		tutorial_funnel = TutorialData.FUNNEL_NAME,
 		-- (the Match Kind event: a war mode's name, and whether a start date is a real one)
 		war_mode_name = function(key: string): string?
 			local m = (require(Shared.Data.Modes) :: any).BY_KEY[key]

@@ -555,6 +555,8 @@ end
 function DoctrineDraft._show(self)
 	local open = self._row ~= nil and (self._sent_at < 0 or self.ctx:render_tick() - self._sent_at > 20)
 	self.panel:set_visible(open and not self._collapsed)
+	-- (the tutorial holding the draft: nothing else calls for it either, no alert, no PICK, until its step; 2026-11-11 review)
+	self.ctx.draft_held = self._row ~= nil and self._collapsed and self:_tutorial_holds(self._row[2])
 	-- (folded, it waits as the alert row's amber diamond: the old chip stays hidden)
 	self.chip:set_visible(false)
 end

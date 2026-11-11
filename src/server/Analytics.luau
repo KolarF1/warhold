@@ -695,7 +695,7 @@ function Analytics.report(player: any, kind: any, a: any, b: any, c: any)
 	elseif kind == "equipped" then
 		custom(player, "Item Equipped", 1, nil, if a == "skin" then "Skin" elseif a == "flag" then "Flag" else nil)
 	elseif kind == "tutorial" then
-		-- (client) a tutorial step: the "Tutorial" funnel (Data/Tutorial.FUNNEL), each step once a match
+		-- (client) a tutorial step: the tutorial's funnel (Data/Tutorial.FUNNEL_NAME, FUNNEL), each step once a match
 		local step = tonumber(a)
 		local names = deps.tutorial_steps or {}
 		if m == nil or step == nil or names[step] == nil then
@@ -706,7 +706,7 @@ function Analytics.report(player: any, kind: any, a: any, b: any, c: any)
 			return
 		end
 		m.tutorial[step] = true
-		call(deps.funnel, player, "Tutorial", m.key, step, names[step], { m.mode, m.exp })
+		call(deps.funnel, player, deps.tutorial_funnel or "Tutorial", m.key, step, names[step], { m.mode, m.exp })
 	elseif kind == "tutorial_skip" then
 		-- (client) Skip was pressed; detail: the step it was on
 		local names = deps.tutorial_steps or {}

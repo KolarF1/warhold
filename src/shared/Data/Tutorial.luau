@@ -83,16 +83,18 @@ Tutorial.NUDGE_S = 5
 Tutorial.PARTS = 4
 Tutorial.STEPS = {
 	{ id = "spawn", part = 1, touch = "Plant your banner on any free land", desktop = "Plant your banner on any free land" },
-	-- (the draft of the opening is on screen from the first second of play; folded, it waits as an amber diamond badge)
+	-- (2026-11-11: the first land comes before the first choice. The opening's draft waits folded until this step is
+	-- done (DoctrineDraft._tutorial_holds), then opens: the funnel lost 43% of new players at a draft that opened the
+	-- moment the banner went down, before they had done anything)
+	{ id = "expand", part = 1, touch = "Free land lies at your border. Take it", desktop = "Free land lies at your border. Take it" },
 	{
 		id = "doctrine",
-		part = 1,
+		part = 2,
 		touch = "Choose what your nation will be",
 		desktop = "Choose what your nation will be",
 		chip = "Tap the amber diamond, then choose",
 		chip_desktop = "Click the amber diamond, then choose",
 	},
-	{ id = "expand", part = 2, touch = "Free land lies at your border. Take it", desktop = "Free land lies at your border. Take it" },
 	-- (the send before the next order: it starts at 10%, and this one sets how a ruler sends from now on)
 	{
 		id = "ratio",
@@ -151,13 +153,15 @@ Tutorial.STEPS = {
 	},
 }
 
---- The "Tutorial" funnel's steps (Creator Dashboard): 1 is the match starting, then one a step,
---- then finishing. A step passed over is not logged.
+--- The tutorial's funnel (Creator Dashboard): its name, and its steps: 1 is the match starting, then one a step, then
+--- finishing. A step passed over is not logged. (2026-11-11: the steps' order changed, the first land before the first
+--- choice, so it is a new funnel: Roblox fills in a skipped number, and "Tutorial" keeps the old order's history.)
+Tutorial.FUNNEL_NAME = "Tutorial v2"
 Tutorial.FUNNEL = {
 	"Started",
 	"Spawned",
-	"Chose Doctrine",
 	"First Tap",
+	"Chose Doctrine",
 	"Used Slider",
 	"Built City",
 	"Learned Ages",

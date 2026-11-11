@@ -152,7 +152,7 @@ function AlertRow.collect(self): { any }
 	end
 	local row = UICtx.mod("DoctrineDraft").open_row(s, me)
 	local draft_open = self.ui ~= nil and self.ui.draft ~= nil and self.ui.draft.panel.visible
-	if row ~= nil and s.phase == Defs.PHASE_PLAYING and not draft_open then
+	if row ~= nil and s.phase == Defs.PHASE_PLAYING and not draft_open and not ctx.draft_held then
 		local left = math.max(0, math.ceil((row[7] - now) / rate))
 		local what = if s.depth ~= nil then "An idea is ready to choose" else "A doctrine is ready to pick"
 		table.insert(out, { key = "draft:" .. row[2], kind = "draft", urgency = 150 + math.max(0, 60 - left), line = string.format("%s · auto-picks in %s", what, T.fmt_time(left)) })

@@ -8,6 +8,14 @@ export type Release = { version: string, date: string, title: string, lines: { s
 
 PatchNotes.RELEASES = {
 	{
+		version = "0.9.12",
+		date = "11 Nov 2026",
+		title = "First Steps",
+		lines = {
+			"In your first war, you take your first land before choosing your first doctrine.",
+		},
+	},
+	{
 		version = "0.9.11",
 		date = "11 Nov 2026",
 		title = "Steady Hands",

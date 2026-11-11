@@ -39,7 +39,7 @@ function ActionDock.waiting(ctx: any): { [string]: any }
 	local ok, row = pcall(function()
 		return UICtx.mod("DoctrineDraft").open_row(s, me)
 	end)
-	out.doctrine = ok and row ~= nil
+	out.doctrine = ok and row ~= nil and not ctx.draft_held
 	for key in s.requests or {} do
 		if key % 1024 == me and key // 1024 ~= me then
 			out.offers += 1
