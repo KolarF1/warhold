@@ -86,6 +86,13 @@ local started = false
 --- Reports an error once per distinct message (first line), so a recurring fault can't flood the log.
 local reported: { [string]: boolean } = {}
 local reported_n = 0
+-- the server's own script errors as analytics too (Analytics.server_error: the Script Error event, 2026-11-11)
+game:GetService("ScriptContext").Error:Connect(function(message: string)
+	pcall(function()
+		Analytics.server_error(message, game:GetService("Players"):GetPlayers()[1])
+	end)
+end)
+
 local function report_once(where: string, err: any)
 	local text = tostring(err)
 	local key = where .. ":" .. (string.match(text, "^[^\n]*") or "")
@@ -1346,6 +1353,14 @@ function ServerMain.start()
 			return if s ~= nil then s.name .. " Pack" else nil, if p ~= nil then p.robux else 0
 		end,
 		tutorial_steps = TutorialData.FUNNEL,
+		-- (the Match Kind event: a war mode's name, and whether a start date is a real one)
+		war_mode_name = function(key: string): string?
+			local m = (require(Shared.Data.Modes) :: any).BY_KEY[key]
+			return if m ~= nil then m.name else nil
+		end,
+		period_ok = function(key: string): boolean
+			return (require(Shared.Data.Periods) :: any).get(key) ~= nil
+		end,
 		arsenal_title = function(key: string): string?
 			local it = (require(Shared.Data.Arsenal) :: any).item(key)
 			return if it ~= nil then it.title else nil

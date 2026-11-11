@@ -58,6 +58,12 @@
 --   Analytics.from_client(player, kind, a, b, c)   an OP.ANALYTICS message: the server's own reports refused
 --   Analytics.economy(player, flow, amount, balance, transaction, sku, fields?)   Renown in or out (Economy dashboard)
 --
+--   Script Error (CustomField01 = Client / Server, 02 = where: "<Script>:<line>", 03 = the message, 80 characters):
+--     the game's own script errors (2026-11-11), each once per player session (a server's own: once per server), at most
+--     SCRIPT_ERRORS_MAX each; only errors from the game's own scripts, and never a player's name
+--   Match Kind (once per match; CustomField01 = the kind of war: Conquest / Blitz / King of the Hill / Deadline /
+--     Skirmish / Total War / Hardcore, CustomField02 = Classic / Long / Quick, CustomField03 = the start date: Today /
+--     867 / 1066 / 1187 / 1241): which wars are played (client, checked against Data/Modes and Data/Periods; 2026-11-11)
 --   Community Prompt (detail "<Title | Guide | Results> - <Joined | Pending | Already Member | Declined | Failed>"):
 --     Roblox's prompt to join the game's community, from where, and what it came to (client, 2026-11-09)
 --   Economy → Renown (2026-11-09; server/Purchases and server/Rewards log every change, after it is stored):
@@ -140,6 +146,34 @@ Analytics.RARITY_NAMES = { common = "Common", rare = "Rare", epic = "Epic", lege
 Analytics.STATS = "stats"
 --- The Economy dashboard's one currency (renaming it later breaks the dashboard's history).
 Analytics.CURRENCY = "Renown"
+--- Script errors one player's session (or one server) may log.
+Analytics.SCRIPT_ERRORS_MAX = 20
+--- The longest message a Script Error keeps.
+Analytics.SCRIPT_ERROR_TEXT = 80
+
+--- A script error's (where, what), or nil when it isn't one of the game's own: "<path>:<line>: <text>" with the path
+--- inside the game's scripts (Airfront...). Player names (Players.<name>.) never survive; the text is cut short.
+function Analytics.error_parts(message: any): (string?, string?)
+	if type(message) ~= "string" then
+		return nil, nil
+	end
+	local first = string.match(message, "^[^\n]*") or ""
+	local path, line, text = string.match(first, "^(.-):(%d+):%s*(.*)$")
+	if path == nil or not string.find(path, "Airfront", 1, true) then
+		return nil, nil
+	end
+	local script = string.match(path, "([%w_]+)$") or "Unknown"
+	-- (a path inside a message names a player too: Players.<name>.PlayerScripts...)
+	text = string.gsub(text, "Players%.[^%.%s]+%.", "Players.<Player>.")
+	text = string.gsub(text, "[%c]", " ")
+	if #text > Analytics.SCRIPT_ERROR_TEXT then
+		text = string.sub(text, 1, Analytics.SCRIPT_ERROR_TEXT - 3) .. "..."
+	end
+	return script .. ":" .. line, text
+end
+
+--- The depth of a war as the Match Kind event names it (Data/Depth keys; "" is the classic war).
+Analytics.DEPTHS = { [""] = "Classic", long = "Long", quick = "Quick" }
 --- Reports only the server makes: from a client they are refused (a tampered client could write any value into them;
 --- 2026-11-09 audit). A kind maps to true (all of it) or to the set of its `a` the server owns.
 Analytics.SERVER_ONLY = {
@@ -171,9 +205,19 @@ type Match = {
 	snap: { situation: string, standing: string, fps: number }?,
 	slow: boolean?,
 	slow_mem: boolean?,
+	--- the Match Kind event went (once a match)
+	kind_logged: boolean?,
 }
 --- `matches` / `ten`: the saved stats once loaded (matches played; a match has lasted 10 minutes: what "Second Match" needs)
-type Entry = { onboarding: { [number]: boolean }, match: Match?, matches: number?, ten: boolean? }
+type Entry = {
+	onboarding: { [number]: boolean },
+	match: Match?,
+	matches: number?,
+	ten: boolean?,
+	--- the Script Errors this session logged (where|what), and how many
+	errors: { [string]: boolean }?,
+	errors_n: number?,
+}
 -- (a Match may also carry `tutorial`: the tutorial steps logged for it)
 
 local IS_ROBLOX = typeof(game) == "Instance"
@@ -265,8 +309,14 @@ function Analytics.configure(d: { [string]: any })
 end
 
 --- Tests: forget everyone.
+--- the server's own Script Errors logged (where|what), and how many (Analytics.server_error)
+local server_errors: { [string]: boolean } = {}
+local server_errors_n = 0
+
 function Analytics.reset()
 	table.clear(entries)
+	table.clear(server_errors)
+	server_errors_n = 0
 end
 
 local function entry(player: any): Entry
@@ -287,6 +337,24 @@ local function call(fn: any, ...: any)
 		deps.warn("[Analytics] " .. tostring(err))
 	end
 end
+
+
+--- A script error on this server (ScriptContext.Error): once per server per kind, logged against a player who is here
+--- (Roblox's events need one; nothing when no one is).
+function Analytics.server_error(message: any, player: any)
+	local where, what = Analytics.error_parts(message)
+	if where == nil or player == nil then
+		return
+	end
+	local key = where .. "|" .. what
+	if server_errors[key] or server_errors_n >= Analytics.SCRIPT_ERRORS_MAX then
+		return
+	end
+	server_errors[key] = true
+	server_errors_n += 1
+	call(deps.custom, player, "Script Error", 1, { "Server", where, what })
+end
+
 
 Analytics.HUMAN_BANDS = {
 	{ 1, 1, "1" },
@@ -712,6 +780,35 @@ function Analytics.report(player: any, kind: any, a: any, b: any, c: any)
 				custom(player, "Flag Bought", math.floor(paid), nil, name)
 			end
 		end
+	elseif kind == "script_error" then
+		-- (client) one of the client's script errors: only the game's own, cleaned; once each, SCRIPT_ERRORS_MAX a session
+		local where, what = Analytics.error_parts(a)
+		if where == nil then
+			return
+		end
+		e.errors = e.errors or {}
+		local key = where .. "|" .. what
+		if e.errors[key] or (e.errors_n or 0) >= Analytics.SCRIPT_ERRORS_MAX then
+			return
+		end
+		e.errors[key] = true
+		e.errors_n = (e.errors_n or 0) + 1
+		call(deps.custom, player, "Script Error", 1, { "Client", where, what })
+	elseif kind == "match_kind" then
+		-- (client, right after match_start) the war's kind, depth and start date, each checked; once a match
+		if m == nil or m.kind_logged then
+			return
+		end
+		local war = if type(a) == "string" and deps.war_mode_name then deps.war_mode_name(a) else nil
+		local depth = Analytics.DEPTHS[if type(b) == "string" then b else ""]
+		local period = if c == nil or c == "" then "Today"
+			elseif type(c) == "string" and deps.period_ok and deps.period_ok(c) then c
+			else nil
+		if war == nil or depth == nil or period == nil then
+			return
+		end
+		m.kind_logged = true
+		call(deps.custom, player, "Match Kind", 1, { war, depth, period })
 	elseif kind == "community" then
 		-- (client) Roblox's prompt to join the game's community: from Title / Guide / Results, and what it came to
 		local froms = { title = "Title", guide = "Guide", results = "Results" }

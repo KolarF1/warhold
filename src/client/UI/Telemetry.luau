@@ -480,6 +480,9 @@ function Telemetry.tick(self)
 			self._match = m
 			self.matches_started += 1
 			self:_send("match_start", mode, tostring(st.map_id or ""))
+			-- (what kind of war it is: the "Match Kind" event, 2026-11-11; the server checks every value)
+			local depth = if type(st.depth) == "table" and type(st.depth.key) == "string" then st.depth.key else ""
+			self:_send("match_kind", tostring(st.mode or ""), depth, tostring(st.period or ""))
 		end
 	end
 	self:_slow_check(m)

@@ -114,6 +114,28 @@ function UIRoot.new(opts: any?)
 	--- Creator Dashboard milestones (server/Analytics)
 	self.telemetry = Telemetry.new(self.ctx)
 	self.ctx.telemetry = self.telemetry
+	-- the client's script errors to the analytics (the Script Error event, 2026-11-11): each message once, at most 20 a
+	-- session, the server keeps only the game's own and strips names (Analytics.error_parts)
+	do
+		local seen, n = {}, 0
+		local ok_sc, sc = pcall(function()
+			return game:GetService("ScriptContext")
+		end)
+		if ok_sc and sc ~= nil then
+			sc.Error:Connect(function(message: string)
+				local text = string.sub(tostring(message), 1, 300)
+				if seen[text] or n >= 20 then
+					return
+				end
+				seen[text] = true
+				n += 1
+				local s = self.ctx.session
+				if s ~= nil and type(s.report) == "function" then
+					pcall(s.report, s, "script_error", text)
+				end
+			end)
+		end
+	end
 	self.labels_on = true
 	self._screen = ""
 	self._conns = {}

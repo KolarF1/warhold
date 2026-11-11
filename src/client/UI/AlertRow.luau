@@ -55,12 +55,7 @@ function AlertRow.new(c: any, ui: any)
 		b:add_child(shape.node)
 		local rec = { button = b, shape = shape, badge = nil }
 		b.pressed:Connect(function()
-			if rec.badge ~= nil then
-				self:act(rec.badge)
-				if c.touch then
-					c:show_hint(b, self:card(rec.badge), true)
-				end
-			end
+			self:_press(rec)
 		end)
 		FrameKit.on_click(b, nil, function()
 			if rec.badge ~= nil then
@@ -297,6 +292,19 @@ function AlertRow.act(self, b: any)
 		ctx:world_call("focus_owner", { b.owner })
 	end
 	self:refresh()
+end
+
+--- A badge pressed: it acts, and on a touch screen its card shows. The badge is held first: acting refreshes the row,
+--- which can empty the slot (live 2026-11-10: 162 errors from a card asked of a slot that had just emptied).
+function AlertRow._press(self, rec: any)
+	local badge = rec.badge
+	if badge == nil then
+		return
+	end
+	self:act(badge)
+	if self.ctx.touch then
+		self.ctx:show_hint(rec.button, self:card(badge), true)
+	end
 end
 
 --- A badge's right-click: gone until something new of its kind comes.

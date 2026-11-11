@@ -105,7 +105,9 @@ function UIInteract.select_action(self: any, kind: string)
 		return
 	end
 	if not av.ok then
-		if b ~= nil then
+		-- (the action bar's slots are plain buttons with no shake of their own since the HUD's rebuild: only a button that
+		-- has one shakes; the reason below says why either way. Live 2026-11-10: 290 errors from calling it on every slot)
+		if b ~= nil and type(b.deny) == "function" then
 			b:deny()
 		end
 		ctx:sfx("deny")
